@@ -42,6 +42,9 @@ import com.kododake.aabrowser.tabs.BrowserTab
 import com.kododake.aabrowser.ui.MainActivitySetup
 import com.kododake.aabrowser.ui.controllers.NavigationButtonUpdater
 import com.kododake.aabrowser.ui.controllers.ProgressIndicatorController
+import android.car.Car
+import android.car.drivingstate.CarUxRestrictions
+import android.car.drivingstate.CarUxRestrictionsManager
 
 class MainActivity : AppCompatActivity(), MainActivityCallbackFactory.CallbackHost {
 
@@ -104,6 +107,10 @@ class MainActivity : AppCompatActivity(), MainActivityCallbackFactory.CallbackHo
         super.attachBaseContext(scaled ?: newBase)
     }
 
+    private var carInstance: Any? = null
+    private var uxRestrictionsManagerInstance: Any? = null
+
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         WebViewWarmupHelper.warmup(this)
         DynamicColors.applyToActivityIfAvailable(this)
@@ -123,6 +130,7 @@ class MainActivity : AppCompatActivity(), MainActivityCallbackFactory.CallbackHo
         FreeDroidWarnHelper.checkAndShow(this, managers.themeManager.resolveThemeColor(androidx.appcompat.R.attr.colorError)) { url ->
             managers.navigationManager.loadUrlFromIntent(url)
         }
+        setupCarRestrictions()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -157,7 +165,42 @@ class MainActivity : AppCompatActivity(), MainActivityCallbackFactory.CallbackHo
         managers.startPageManager.onDestroy()
         managers.tabManager.destroy()
         webView = null
+        runCatching { (carInstance as? Car)?.disconnect() }
         super.onDestroy()
+    }
+    
+    private fun setupCarRestrictions() {
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)) return
+        try {
+            val car = Car.createCar(this)
+            carInstance = car
+            val manager = car.getCarManager(Car.CAR_UX_RESTRICTION_SERVICE) as? CarUxRestrictionsManager
+            uxRestrictionsManagerInstance = manager
+            manager?.registerListener { restrictions ->
+                runOnUiThread { handleUxRestrictions(restrictions) }
+            }
+            manager?.getCurrentCarUxRestrictions()?.let { handleUxRestrictions(it) }
+        } catch (_: Exception) {}
+    }
+
+    private fun handleUxRestrictions(restrictions: CarUxRestrictions) {
+        if (isFinishing || isDestroyed) return
+        if (BrowserPreferences.isBypassMotionRestrictionsEnabled(this)) {
+            binding.addressEdit.isEnabled = true
+            binding.addressEdit.hint = getString(R.string.menu_address_label)
+            return
+        }
+
+        val isRestricted = restrictions.activeRestrictions != 0
+
+        if (isRestricted) {
+            binding.addressEdit.isEnabled = false
+            binding.addressEdit.hint = "Disabled while driving"
+            if (binding.menuOverlay.isVisible) hideMenuOverlay()
+        } else {
+            binding.addressEdit.isEnabled = true
+            binding.addressEdit.hint = getString(R.string.menu_address_label)
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
