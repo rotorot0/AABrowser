@@ -39,6 +39,7 @@ object BrowserPreferences {
     const val MIN_GLOBAL_SCALE_PERCENT = DisplayPreferences.MIN_GLOBAL_SCALE_PERCENT
     const val MAX_GLOBAL_SCALE_PERCENT = DisplayPreferences.MAX_GLOBAL_SCALE_PERCENT
     const val DEFAULT_GLOBAL_SCALE_PERCENT = DisplayPreferences.DEFAULT_GLOBAL_SCALE_PERCENT
+    const val KEY_BYPASS_MOTION_RESTRICTIONS = "bypass_motion_restrictions"
 
     // --- URL Formatter ---
     fun formatNavigableUrl(raw: String): String = UrlFormatter.formatNavigableUrl(raw)
@@ -130,4 +131,17 @@ object BrowserPreferences {
     // --- Web Engine & DRM ---
     fun isDrmL3EnforcerEnabled(context: Context): Boolean = WebPreferences.isDrmL3EnforcerEnabled(context)
     fun setDrmL3EnforcerEnabled(context: Context, enabled: Boolean) = WebPreferences.setDrmL3EnforcerEnabled(context, enabled)
+
+    // --- Motion ---
+    fun isBypassMotionRestrictionsEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_BYPASS_MOTION_RESTRICTIONS, false)
+    }
+
+    fun setBypassMotionRestrictions(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_BYPASS_MOTION_RESTRICTIONS, enabled)
+            .apply()
+    }
 }
